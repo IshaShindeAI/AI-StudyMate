@@ -1,87 +1,89 @@
-from flask import Flask, request, jsonify
+import streamlit as st
 from groq import Groq
+from pypdf import PdfReader
 import os
+from dotenv import load_dotenv
 
-app = Flask(__name__)
+load_dotenv()
 
+st.set_page_config(
+    page_title="AI StudyMate",
+    page_icon="📚"
+)
 
-@app.route("/")
-def home():
-    return "AI StudyMate is running!"
-
-
-@app.route("/chat", methods=["POST"])
-def chat():
-
-    try:
-        # Check if Groq key exists in Vercel
-        api_key = os.environ.get("GROQ_API_KEY")
-
-        if not api_key:
-            return jsonify({
-                "error": "GROQ_API_KEY is missing in Vercel Environment Variables"
-            }), 500
+st.title("📚 AI StudyMate")
+st.write("Upload your study PDF and generate notes, flashcards, quizzes and revision material using AI.")
 
 
-        client = Groq(
-            api_key=api_key
-        )
+api_key = os.getenv("GROQ_API_KEY")
+
+client = Groq(
+    api_key=api_key
+)
 
 
-        data = request.get_json()
-
-        if not data:
-            return jsonify({
-                "error": "No JSON data received"
-            }), 400
+uploaded_file = st.file_uploader(
+    "Upload your PDF",
+    type="pdf"
+)
 
 
-        message = data.get("message")
+if uploaded_file:
 
-        if not message:
-            return jsonify({
-                "error": "Message is missing"
-            }), 400
+    reader = PdfReader(uploaded_file)
 
+    text = ""
 
-        response = client.chat.completions.create(
+    for page in reader.pages:
+        page_text = page.extract_text()
 
-            model="llama-3.1-8b-instant",
-
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are AI StudyMate, a helpful study assistant."
-                },
-                {
-                    "role": "user",
-                    "content": message
-                }
-            ]
-
-        )
+        if page_text:
+            text += page_text
 
 
-        return jsonify({
-
-            "reply": response.choices[0].message.content
-
-        })
+    st.success("PDF uploaded successfully ✅")
 
 
-    except Exception as e:
+    if st.button("Generate Study Material"):
 
-        return jsonify({
-
-            "error": str(e)
-
-        }), 500
+        with st.spinner("AI is preparing your study material..."):
 
 
+            prompt = f"""
+You are AI StudyMate, a smart learning assistant.
 
-# Local testing
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=3000
-    )
+Create:
+
+1. Simple summary notes
+2. Important exam points
+3. Flashcards Q&A format
+4. 10 quiz questions with answers
+5. Revision plan
+
+Make it student friendly.
+
+Study Material:
+
+{text}
+"""
+
+
+            response = client.chat.completions.create(
+
+                model="llama-3.1-8b-instant",
+
+                messages=[
+                    {
+                        "role":"user",
+                        "content":prompt
+                    }
+                ]
+
+            )
+
+
+            st.subheader("📖 AI Generated Study Material")
+
+            st.write(
+                response.choices[0].message.content
+            )

@@ -1,4 +1,4 @@
-flask
+streamlit
 groq
-gunicorn
+pypdf
 python-dotenv
